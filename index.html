@@ -2,28 +2,77 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Controle de Notas Noah 8º 01</title>
-  <link rel="stylesheet" href="css/estilo.css">
+  <link rel="stylesheet" href="./css/style.css">
+  <!-- Adicione isso para verificar se o CSS está carregando -->
+  <noscript>
+    <style>
+      body::before {
+        content: "JavaScript está desabilitado! Este site requer JavaScript.";
+        display: block;
+        padding: 20px;
+        background: red;
+        color: white;
+        text-align: center;
+        font-size: 24px;
+      }
+    </style>
+  </noscript>
 </head>
 <body>
-  <h2 style="text-align:center">Controle de Notas Noah - 2º Trimestre</h2>
-  <div class="scroll-container">
-    <table>
-      <thead>
-        <tr>
-          <th>Disciplina</th>
-          <th>VI (10,0)</th>
-          <th>VE (10,0)</th>
-          <th>VC (10,0)</th>
-          <th>Média</th>
-          <th>Recuperação</th>
-        </tr>
-      </thead>
-      <tbody id="disciplinas">
-        <!-- Gerado pelo JavaScript -->
-      </tbody>
-    </table>
+  <div id="loading" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; display: flex; justify-content: center; align-items: center; z-index: 1000;">
+    <div style="text-align: center;">
+      <h2>Carregando...</h2>
+      <p id="load-status">Inicializando aplicação</p>
+    </div>
   </div>
-  <script src="js/script.js"></script>
+
+  <div id="app-content" style="display: none;">
+    <h2 style="text-align:center">Controle de Notas Noah - 2º Trimestre</h2>
+    <div class="scroll-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Disciplina</th>
+            <th>VI (10,0)</th>
+            <th>VE (10,0)</th>
+            <th>VC (10,0)</th>
+            <th>Média</th>
+            <th>Recuperação</th>
+          </tr>
+        </thead>
+        <tbody id="disciplinas">
+          <!-- Gerado pelo JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="firebase-error" style="display: none; position: fixed; bottom: 10px; right: 10px; padding: 10px; background: #ffdddd; border: 1px solid red;">
+    Erro no Firebase: <span id="firebase-error-text"></span>
+  </div>
+
+  <!-- Adicione type="module" para suporte a imports ES6 -->
+  <script type="module" src="./js/script.js"></script>
+  
+  <!-- Fallback para caso o JavaScript não carregue -->
+  <script>
+    setTimeout(() => {
+      if (!window.firebaseLoaded) {
+        document.getElementById('loading').innerHTML = `
+          <div style="text-align: center; color: red;">
+            <h2>Erro ao carregar o aplicativo</h2>
+            <p>O JavaScript não carregou corretamente. Verifique:</p>
+            <ul style="text-align: left; display: inline-block;">
+              <li>Conexão com a internet</li>
+              <li>Se o JavaScript está habilitado</li>
+              <li>Console do navegador (F12) para erros</li>
+            </ul>
+          </div>
+        `;
+      }
+    }, 5000);
+  </script>
 </body>
 </html>
