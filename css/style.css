@@ -1,0 +1,82 @@
+table {
+  border-collapse: collapse;
+  width: 95%;
+  margin: 20px auto;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: center;
+}
+th {
+  background-color: #f0f0f0;
+  position: sticky;
+  top: 0;
+}
+.media-baixa {
+  color: red;
+  font-weight: bold;
+}
+.media-ok {
+  color: green;
+  font-weight: bold;
+}
+input[type="number"] {
+  width: 50px;
+  text-align: center;
+}
+.mensagem {
+  font-size: 0.7em;
+  color: #666;
+  margin-top: 3px;
+}
+.recuperacao {
+  color: purple;
+  font-weight: bold;
+}
+.scroll-container {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.extras-area {
+  background: #f9f9f9;
+  padding: 10px;
+  margin-top: 5px;
+  border-radius: 5px;
+}
+.extra-item {
+  margin-bottom: 5px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.extra-item input[type="number"] {
+  width: 50px;
+}
+.extra-item input[type="text"] {
+  flex: 1;
+  padding: 3px;
+}
+.total-extra {
+  font-size: 0.8em;
+  color: #555;
+  margin-top: 3px;
+}
+.btn-lixeira {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ff4444;
+}
+.add-btn {
+  margin-top: 5px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.add-btn:hover {
+  background: #45a049;
+}
