@@ -1,20 +1,54 @@
-// Adicione esta linha no topo para verificação
-window.firebaseLoaded = false;
+// controle-notas-noah/js/script.js - Código Completo Refatorado
 
-// Configuração de debug
+// Configurações globais
 const debug = true;
+const MEDIA_MINIMA = 7.0;
+const materias = [
+  "LÍNGUA PORTUGUESA", "MATEMÁTICA", "GEOGRAFIA", "HISTÓRIA",
+  "CIÊNCIAS", "ARTES", "EDUCAÇÃO FÍSICA", "LÍNGUA INGLESA",
+  "ENSINO RELIGIOSO", "METODOLOGIA", "FÍSICA", "QUÍMICA"
+];
 
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDZHN8midySi4NG0ZxNY2GQU_gRtTL6cWA",
+  authDomain: "controle-notas-noah.firebaseapp.com",
+  projectId: "controle-notas-noah",
+  storageBucket: "controle-notas-noah.appspot.com",
+  messagingSenderId: "1072700126154",
+  appId: "1:1072700126154:web:8cc319774f01ce5555d533"
+};
+
+// Inicialização do Firebase
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Utilitários
 function log(message) {
   if (debug) {
     console.log(message);
     const statusElement = document.getElementById('load-status');
-    if (statusElement) {
-      statusElement.textContent = message;
-    }
+    if (statusElement) statusElement.textContent = message;
   }
 }
 
-// Atualiza o status do Firebase
+function handleError(message, error, showToUser = false) {
+  console.error(message, error);
+  if (showToUser) {
+    updateFirebaseStatus(message, true);
+    document.getElementById('loading').innerHTML = `
+      <div style="text-align: center; color: red;">
+        <h2>Erro no aplicativo</h2>
+        <p>${message}</p>
+        <button onclick="location.reload()">Recarregar</button>
+      </div>
+    `;
+  }
+}
+
 function updateFirebaseStatus(message, isError = false) {
   log(message);
   const errorElement = document.getElementById('firebase-error');
@@ -26,112 +60,87 @@ function updateFirebaseStatus(message, isError = false) {
   }
 }
 
-// Importando as funções do Firebase SDK
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, setDoc, doc } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+// Funções de manipulação de dados
+function coletarDadosMateria(index) {
+  const dados = {
+    principal: { vi: 0, ve: 0, vc: 0 },
+    extras: { vi: [], ve: [], vc: [] },
+    totais: { vi: 0, ve: 0, vc: 0 }
+  };
 
-// Configuração do Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyDZHN8midySi4NG0ZxNY2GQU_gRtTL6cWA",
-  authDomain: "controle-notas-noah.firebaseapp.com",
-  projectId: "controle-notas-noah",
-  storageBucket: "controle-notas-noah.appspot.com",
-  messagingSenderId: "1072700126154",
-  appId: "1:1072700126154:web:8cc319774f01ce5555d533",
-  measurementId: "G-ZC8M34N8NQ"
-};
+  // Coleta notas principais
+  ['vi', 've', 'vc'].forEach(tipo => {
+    const input = document.getElementById(`${tipo}-${index}`);
+    dados.principal[tipo] = parseFloat(input?.value) || 0;
+  });
 
-// Inicializando o Firebase
-let db;
-try {
-  log("Inicializando Firebase...");
-  const app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  window.firebaseLoaded = true;
-  log("Firebase inicializado com sucesso!");
-} catch (error) {
-  updateFirebaseStatus(`Erro ao inicializar Firebase: ${error.message}`, true);
-  console.error("Erro ao inicializar Firebase:", error);
+  // Coleta atividades extras (com descrições personalizadas)
+  ['vi', 've', 'vc'].forEach(tipo => {
+    const area = document.getElementById(`extras-${tipo}-${index}`);
+    if (area) {
+      const itens = area.querySelectorAll('.extra-item');
+      itens.forEach(item => {
+        const valorInput = item.querySelector('input[type="number"]');
+        const descricaoInput = item.querySelector('input[type="text"]');
+        
+        if (valorInput && descricaoInput) {
+          dados.extras[tipo].push({
+            valor: parseFloat(valorInput.value) || 0,
+            descricao: descricaoInput.value.trim() || "Atividade extra"
+          });
+        }
+      });
+    }
+  });
+
+  // Calcula totais
+  ['vi', 've', 'vc'].forEach(tipo => {
+    const somaExtras = dados.extras[tipo].reduce((sum, extra) => sum + extra.valor, 0);
+    dados.totais[tipo] = Math.min(dados.principal[tipo] + somaExtras, 10);
+  });
+
+  return dados;
 }
 
-// Array de matérias
-const materias = [
-  "LÍNGUA PORTUGUESA", "MATEMÁTICA", "GEOGRAFIA", "HISTÓRIA",
-  "CIÊNCIAS", "ARTES", "EDUCAÇÃO FÍSICA", "LÍNGUA INGLESA",
-  "ENSINO RELIGIOSO", "METODOLOGIA", "FÍSICA", "QUÍMICA"
-];
-
-// Função principal para carregar a aplicação
-async function loadApp() {
-  try {
-    log("Carregando disciplinas...");
-    const tbody = document.getElementById('disciplinas');
-    
-    if (!tbody) {
-      throw new Error("Elemento 'disciplinas' não encontrado no DOM");
-    }
-
-    // Limpa o conteúdo de loading e mostra o app
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app-content').style.display = 'block';
-
-    for (let index = 0; index < materias.length; index++) {
-      const materia = materias[index];
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${materia}</td>
-        <td>
-          <input type="number" id="vi-${index}" min="0" max="10" step="0.1" oninput="calcular(${index})">
-          <div id="extras-vi-${index}" class="extras-area">
-            <button class="add-btn" onclick="adicionarExtra('vi-${index}')">+ Atividade</button>
-          </div>
-          <div class="total-extra">Total VI: <span id="total-vi-${index}">0.0</span>/10</div>
-          <div id="vi-msg-${index}" class="mensagem"></div>
-        </td>
-        <td>
-          <input type="number" id="ve-${index}" min="0" max="10" step="0.1" oninput="calcular(${index})">
-          <div id="extras-ve-${index}" class="extras-area">
-            <button class="add-btn" onclick="adicionarExtra('ve-${index}')">+ Atividade</button>
-          </div>
-          <div class="total-extra">Total VE: <span id="total-ve-${index}">0.0</span>/10</div>
-          <div id="ve-msg-${index}" class="mensagem"></div>
-        </td>
-        <td>
-          <input type="number" id="vc-${index}" min="0" max="10" step="0.1" oninput="calcular(${index})">
-          <div id="extras-vc-${index}" class="extras-area">
-            <button class="add-btn" onclick="adicionarExtra('vc-${index}')">+ Atividade</button>
-          </div>
-          <div class="total-extra">Total VC: <span id="total-vc-${index}">0.0</span>/10</div>
-          <div id="vc-msg-${index}" class="mensagem"></div>
-        </td>
-        <td id="media-${index}">-</td>
-        <td id="recuperacao-msg-${index}" class="mensagem">-</td>
-      `;
-      tbody.appendChild(tr);
-
-      // Buscar as notas salvas no Firestore para cada matéria
-      await buscarNotasFirestore(index);
-    }
-    
-    log("Aplicação carregada com sucesso!");
-  } catch (error) {
-    updateFirebaseStatus(`Erro ao carregar aplicação: ${error.message}`, true);
-    console.error("Erro ao carregar aplicação:", error);
-    
-    // Mostra mensagem de erro para o usuário
-    document.getElementById('loading').innerHTML = `
-      <div style="text-align: center; color: red;">
-        <h2>Erro ao carregar o aplicativo</h2>
-        <p>${error.message}</p>
-        <p>Por favor, recarregue a página ou tente novamente mais tarde.</p>
+// Funções de UI
+function criarLinhaMateria(index, materia) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${materia}</td>
+    <td>
+      <input type="number" id="vi-${index}" min="0" max="10" step="0.1" oninput="calcular(${index})">
+      <div id="extras-vi-${index}" class="extras-area">
+        <button class="add-btn" onclick="adicionarExtra('vi-${index}')">+ Atividade</button>
       </div>
-    `;
-  }
+      <div class="total-extra">Total VI: <span id="total-vi-${index}">0.0</span>/10</div>
+      <div id="vi-msg-${index}" class="mensagem"></div>
+    </td>
+    <td>
+      <input type="number" id="ve-${index}" min="0" max="10" step="0.1" oninput="calcular(${index})">
+      <div id="extras-ve-${index}" class="extras-area">
+        <button class="add-btn" onclick="adicionarExtra('ve-${index}')">+ Atividade</button>
+      </div>
+      <div class="total-extra">Total VE: <span id="total-ve-${index}">0.0</span>/10</div>
+      <div id="ve-msg-${index}" class="mensagem"></div>
+    </td>
+    <td>
+      <input type="number" id="vc-${index}" min="0" max="10" step="0.1" oninput="calcular(${index})">
+      <div id="extras-vc-${index}" class="extras-area">
+        <button class="add-btn" onclick="adicionarExtra('vc-${index}')">+ Atividade</button>
+      </div>
+      <div class="total-extra">Total VC: <span id="total-vc-${index}">0.0</span>/10</div>
+      <div id="vc-msg-${index}" class="mensagem"></div>
+    </td>
+    <td id="media-${index}">-</td>
+    <td id="recuperacao-msg-${index}" class="mensagem">-</td>
+  `;
+  return tr;
 }
 
-// Adiciona as funções ao escopo global para que possam ser chamadas nos eventos HTML
 window.adicionarExtra = function(id) {
   const extrasArea = document.getElementById(`extras-${id}`);
+  if (!extrasArea) return;
+
   const novoExtra = document.createElement('div');
   novoExtra.className = 'extra-item';
   novoExtra.innerHTML = `
@@ -139,136 +148,185 @@ window.adicionarExtra = function(id) {
     <input type="text" placeholder="Descrição">
     <button class="btn-lixeira" onclick="this.parentElement.remove(); calcular(${id.split('-')[1]});">🗑️</button>
   `;
-  extrasArea.insertBefore(novoExtra, extrasArea.querySelector('.add-btn'));
-};
-
-window.calcular = function(index) {
-  try {
-    const mediaMinima = 7.0;
-    const totalMinimo = mediaMinima * 3;
-
-    const totalVI = calcularNotaComExtras(`vi-${index}`);
-    const totalVE = calcularNotaComExtras(`ve-${index}`);
-    const totalVC = calcularNotaComExtras(`vc-${index}`);
-
-    const soma = totalVI + totalVE + totalVC;
-    const media = soma / 3;
-
-    document.getElementById(`media-${index}`).textContent = media.toFixed(1);
-    document.getElementById(`media-${index}`).className = media >= mediaMinima ? "media-ok" : "media-baixa";
-
-    const viMsg = document.getElementById(`vi-msg-${index}`);
-    const veMsg = document.getElementById(`ve-msg-${index}`);
-    const vcMsg = document.getElementById(`vc-msg-${index}`);
-    const recuperacaoMsg = document.getElementById(`recuperacao-msg-${index}`);
-
-    viMsg.textContent = "";
-    veMsg.textContent = "";
-    vcMsg.textContent = "";
-    recuperacaoMsg.textContent = "";
-
-    if (totalVI > 0 && totalVE === 0 && totalVC === 0) {
-      const minimoVE = (2 * mediaMinima - totalVI).toFixed(1);
-      veMsg.textContent = totalVI < mediaMinima
-        ? `Precisa de ${minimoVE} na VE para compensar`
-        : `Mínimo ${minimoVE} na VE para manter 7.0`;
-    }
-
-    if (totalVI > 0 && totalVE > 0 && totalVC === 0) {
-      const minimoVC = (totalMinimo - totalVI - totalVE).toFixed(1);
-      vcMsg.textContent = `Precisa de ${minimoVC} na VC para 7.0`;
-    }
-
-    if (media < mediaMinima) {
-      const notaRec = (2 * mediaMinima - media).toFixed(1);
-      recuperacaoMsg.textContent = `Precisa de ${notaRec} na Rec.`;
-      recuperacaoMsg.className = "mensagem recuperacao";
-    }
-
-    // Salvar as notas no Firestore
-    salvarNotasFirestore(index, totalVI, totalVE, totalVC, media);
-  } catch (error) {
-    console.error(`Erro ao calcular para índice ${index}:`, error);
+  
+  const addButton = extrasArea.querySelector('.add-btn');
+  if (addButton) {
+    extrasArea.insertBefore(novoExtra, addButton);
+  } else {
+    extrasArea.appendChild(novoExtra);
   }
 };
 
-function calcularNotaComExtras(id) {
+// Funções de cálculo
+window.calcular = async function(index) {
   try {
-    const notaPrincipal = parseFloat(document.getElementById(id).value) || 0;
-    const extrasArea = document.getElementById(`extras-${id}`);
-    const extrasInputs = extrasArea.querySelectorAll('.extra-item input[type="number"]');
+    const dados = coletarDadosMateria(index);
+    const { vi, ve, vc } = dados.totais;
+    const media = (vi + ve + vc) / 3;
 
-    let somaExtras = 0;
-    extrasInputs.forEach(input => {
-      somaExtras += parseFloat(input.value) || 0;
-    });
-
-    let total = Math.min(notaPrincipal + somaExtras, 10);
-    document.getElementById(`total-${id}`).textContent = total.toFixed(1);
-    return total;
+    // Atualiza UI
+    atualizarTotaisUI(index, dados.totais);
+    atualizarMediaUI(index, media);
+    atualizarMensagensUI(index, dados.totais, media);
+    
+    // Salva no Firestore
+    await salvarNotasFirestore(index, dados);
   } catch (error) {
-    console.error(`Erro ao calcular nota com extras para ${id}:`, error);
-    return 0;
+    handleError(`Erro ao calcular: ${error.message}`, error, true);
+  }
+};
+
+function atualizarTotaisUI(index, totais) {
+  ['vi', 've', 'vc'].forEach(tipo => {
+    const elemento = document.getElementById(`total-${tipo}-${index}`);
+    if (elemento) elemento.textContent = totais[tipo].toFixed(1);
+  });
+}
+
+function atualizarMediaUI(index, media) {
+  const elementoMedia = document.getElementById(`media-${index}`);
+  if (elementoMedia) {
+    elementoMedia.textContent = media.toFixed(1);
+    elementoMedia.className = media >= MEDIA_MINIMA ? "media-ok" : "media-baixa";
   }
 }
 
+function atualizarMensagensUI(index, totais, media) {
+  const { vi, ve, vc } = totais;
+  const mensagens = {
+    vi: "",
+    ve: "",
+    vc: "",
+    recuperacao: ""
+  };
+
+  if (vi > 0 && ve === 0 && vc === 0) {
+    const minimoVE = (2 * MEDIA_MINIMA - vi).toFixed(1);
+    mensagens.ve = vi < MEDIA_MINIMA
+      ? `Precisa de ${minimoVE} na VE para compensar`
+      : `Mínimo ${minimoVE} na VE para manter 7.0`;
+  }
+
+  if (vi > 0 && ve > 0 && vc === 0) {
+    const minimoVC = (3 * MEDIA_MINIMA - vi - ve).toFixed(1);
+    mensagens.vc = `Precisa de ${minimoVC} na VC para 7.0`;
+  }
+
+  if (media < MEDIA_MINIMA) {
+    const notaRec = (2 * MEDIA_MINIMA - media).toFixed(1);
+    mensagens.recuperacao = `Precisa de ${notaRec} na Rec.`;
+  }
+
+  // Aplica mensagens na UI
+  Object.keys(mensagens).forEach(tipo => {
+    const elemento = document.getElementById(`${tipo}-msg-${index}`);
+    if (elemento) {
+      elemento.textContent = mensagens[tipo];
+      if (tipo === 'recuperacao' && mensagens[tipo]) {
+        elemento.className = "mensagem recuperacao";
+      }
+    }
+  });
+}
+
+// Funções do Firestore
 async function buscarNotasFirestore(index) {
   try {
-    if (!db) {
-      throw new Error("Firestore não inicializado");
-    }
-
     log(`Buscando notas para ${materias[index]}...`);
-    const notasRef = collection(db, "notas");
-    const querySnapshot = await getDocs(notasRef);
-    
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.materia === materias[index]) {
-        const viInput = document.getElementById(`vi-${index}`);
-        const veInput = document.getElementById(`ve-${index}`);
-        const vcInput = document.getElementById(`vc-${index}`);
-        
-        if (viInput) viInput.value = data.vi || 0;
-        if (veInput) veInput.value = data.ve || 0;
-        if (vcInput) vcInput.value = data.vc || 0;
-        
-        calcular(index); // Atualiza a média ao carregar as notas
+    const docRef = doc(db, "notas", materias[index]);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      
+      // Carrega notas principais
+      ['vi', 've', 'vc'].forEach(tipo => {
+        const input = document.getElementById(`${tipo}-${index}`);
+        if (input && data[tipo] !== undefined) {
+          input.value = data[tipo];
+        }
+      });
+
+      // Carrega atividades extras
+      if (data.extras) {
+        ['vi', 've', 'vc'].forEach(tipo => {
+          const area = document.getElementById(`extras-${tipo}-${index}`);
+          if (area && data.extras[tipo]) {
+            area.innerHTML = '<button class="add-btn" onclick="adicionarExtra(\'' + tipo + '-' + index + '\')">+ Atividade</button>';
+            
+            data.extras[tipo].forEach(extra => {
+              const novoExtra = document.createElement('div');
+              novoExtra.className = 'extra-item';
+              novoExtra.innerHTML = `
+                <input type="number" value="${extra.valor || 0}" min="0" max="10" step="0.1" oninput="calcular(${index})">
+                <input type="text" value="${extra.descricao || ''}" placeholder="Descrição">
+                <button class="btn-lixeira" onclick="this.parentElement.remove(); calcular(${index});">🗑️</button>
+              `;
+              area.appendChild(novoExtra);
+            });
+          }
+        });
       }
-    });
+
+      // Dispara cálculo inicial
+      calcular(index);
+    }
   } catch (error) {
-    updateFirebaseStatus(`Erro ao buscar notas: ${error.message}`, true);
-    console.error(`Erro ao buscar notas para ${materias[index]}:`, error);
+    handleError(`Erro ao buscar notas: ${error.message}`, error, true);
   }
 }
 
-async function salvarNotasFirestore(index, vi, ve, vc, media) {
+async function salvarNotasFirestore(index, dados) {
   try {
-    if (!db) {
-      throw new Error("Firestore não inicializado");
-    }
-
     log(`Salvando notas para ${materias[index]}...`);
-    const notasRef = doc(db, "notas", materias[index]);
-    await setDoc(notasRef, {
+    const media = (dados.totais.vi + dados.totais.ve + dados.totais.vc) / 3;
+    
+    await setDoc(doc(db, "notas", materias[index]), {
       materia: materias[index],
-      vi: parseFloat(vi.toFixed(1)),
-      ve: parseFloat(ve.toFixed(1)),
-      vc: parseFloat(vc.toFixed(1)),
+      vi: parseFloat(dados.principal.vi.toFixed(1)),
+      ve: parseFloat(dados.principal.ve.toFixed(1)),
+      vc: parseFloat(dados.principal.vc.toFixed(1)),
+      extras: dados.extras,
+      totais: {
+        vi: parseFloat(dados.totais.vi.toFixed(1)),
+        ve: parseFloat(dados.totais.ve.toFixed(1)),
+        vc: parseFloat(dados.totais.vc.toFixed(1))
+      },
       media: parseFloat(media.toFixed(1)),
       ultimaAtualizacao: new Date()
     });
   } catch (error) {
-    updateFirebaseStatus(`Erro ao salvar notas: ${error.message}`, true);
-    console.error(`Erro ao salvar notas para ${materias[index]}:`, error);
+    handleError(`Erro ao salvar notas: ${error.message}`, error, true);
   }
 }
 
-// Inicia a aplicação quando o DOM estiver pronto
+// Inicialização da aplicação
+async function loadApp() {
+  try {
+    log("Carregando disciplinas...");
+    const tbody = document.getElementById('disciplinas');
+    if (!tbody) throw new Error("Elemento 'disciplinas' não encontrado");
+
+    // Limpa loading e mostra o app
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+
+    // Cria linhas para cada matéria
+    materias.forEach((materia, index) => {
+      tbody.appendChild(criarLinhaMateria(index, materia));
+      buscarNotasFirestore(index).catch(e => console.error(e));
+    });
+
+    log("Aplicação carregada com sucesso!");
+  } catch (error) {
+    handleError(`Erro ao carregar aplicação: ${error.message}`, error, true);
+  }
+}
+
+// Inicia a aplicação
 document.addEventListener('DOMContentLoaded', () => {
   log("DOM carregado, iniciando aplicação...");
   loadApp().catch(error => {
-    updateFirebaseStatus(`Erro ao iniciar aplicação: ${error.message}`, true);
-    console.error("Erro ao iniciar aplicação:", error);
+    handleError(`Erro ao iniciar aplicação: ${error.message}`, error, true);
   });
 });
