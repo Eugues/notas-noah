@@ -375,3 +375,19 @@ document.addEventListener('DOMContentLoaded', () => {
     handleError(`Erro ao iniciar aplicação: ${error.message}`, error, true);
   });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<input type="text" value="" placeholder="Descrição" required=""></input>
